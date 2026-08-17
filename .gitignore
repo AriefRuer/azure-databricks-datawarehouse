@@ -1,0 +1,10 @@
+#large data
+data-retailrocket/
+02-data/raw/
+
+#secrets
+.env
+
+#python
+.venv/
+__pycache__/
