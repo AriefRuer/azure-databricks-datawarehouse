@@ -1,0 +1,42 @@
+bundle:
+  name: retailrocket-dw
+
+workspace:
+  host: https://adb-7405615957301424.4.azuredatabricks.net/ 
+
+resources:
+  jobs:
+    RetailRocket_ETL_Pipeline:
+      name: RetailRocket ETL Pipeline
+      tasks:
+        - task_key: ETL_bronze_to_silver
+          notebook_task:
+            notebook_path: /Repos/1211112109@student.mmu.edu.my/azure-databricks-datawarehouse/04-etl/etl-bronze-to-silver
+            source: WORKSPACE
+          job_cluster_key: ETL_jobs_cluster
+        - task_key: ETL_silver_to_gold
+          depends_on:
+            - task_key: ETL_bronze_to_silver
+          notebook_task:
+            notebook_path: /Repos/1211112109@student.mmu.edu.my/azure-databricks-datawarehouse/04-etl/etl-silver-to-gold
+            source: WORKSPACE
+          job_cluster_key: ETL_jobs_cluster
+        - task_key: ETL_verification_validation_checks
+          depends_on:
+            - task_key: ETL_silver_to_gold
+          notebook_task:
+            notebook_path: /Repos/1211112109@student.mmu.edu.my/azure-databricks-datawarehouse/04-etl/etl-verification-checks
+            source: WORKSPACE
+          job_cluster_key: ETL_jobs_cluster
+      job_clusters:
+        - job_cluster_key: ETL_jobs_cluster
+          new_cluster:
+            cluster_name: ""
+            spark_version: 19.x-scala2.13
+            node_type_id: Standard_D4s_v3
+            data_security_mode: DATA_SECURITY_MODE_DEDICATED
+            runtime_engine: PHOTON
+            kind: CLASSIC_PREVIEW
+            is_single_node: true
+      queue:
+        enabled: true
