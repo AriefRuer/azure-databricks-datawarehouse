@@ -22,8 +22,10 @@ resources:
       job_clusters:
         - job_cluster_key: ETL_jobs_cluster
           new_cluster:
-            spark_version: "13.3.x-scala2.12"
-            node_type_id: "Standard_DS3_v2"
+            spark_version: "19.x-scala2.13"
+            node_type_id: "Standard_D4s_v3"
+            data_security_mode: DATA_SECURITY_MODE_DEDICATED
+            runtime_engine: PHOTON
             num_workers: 0
             spark_conf:
               spark.databricks.cluster.profile: singleNode
