@@ -21,7 +21,7 @@ resources:
             custom_tags:
               ResourceClass: SingleNode
           notebook_task:
-            notebook_path: ./04-etl/etl-bronze-to-silver
+            notebook_path: ./04-etl/etl-bronze-to-silver.ipynb
             base_parameters:
               schema: ${var.schema}
         - task_key: silver_to_gold
@@ -36,7 +36,7 @@ resources:
             custom_tags:
               ResourceClass: SingleNode
           notebook_task:
-            notebook_path: ./04-etl/etl-silver-to-gold
+            notebook_path: ./04-etl/etl-silver-to-gold.ipynb
             base_parameters:
               schema: ${var.schema}
         - task_key: quality_checks
@@ -51,7 +51,7 @@ resources:
             custom_tags:
               ResourceClass: SingleNode
           notebook_task:
-            notebook_path: ./04-etl/etl-verification-checks
+            notebook_path: ./04-etl/etl-verification-checks.ipynb
             base_parameters:
               schema: ${var.schema}
 
