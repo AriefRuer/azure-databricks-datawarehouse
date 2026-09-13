@@ -1,0 +1,71 @@
+name: Deploy & Run ETL Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize]
+
+jobs:
+  validate:            # CI - on every PR to main
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate databricks.yml
+        run: |
+          pip install databricks-cli
+          databricks bundle validate   # just checks config, no deploy
+
+  deploy-and-run:     # CD - only on push to dev or main 
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install Databricks CLI
+        run: pip install databricks-cli
+      - name: Configure Databricks CLI
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          mkdir -p ~/.databrickscfg
+          echo "[DEFAULT]" > ~/.databrickscfg
+          echo "host = $DATABRICKS_HOST" >> ~/.databrickscfg
+          echo "token = $DATABRICKS_TOKEN" >> ~/.databrickscfg
+      - name: Set schema based on branch
+        id: set-schema
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            echo "SCHEMA=dev_retailrocket" >> "$GITHUB_OUTPUT"
+          else
+            echo "SCHEMA=dbo" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Sync Git folder
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            BRANCH=dev
+          else
+            BRANCH=main
+          fi
+          databricks repos update --path "/Repos/1211112109@student.mmu.edu.my/azure-databricks-datawarehouse" --branch "$BRANCH"
+      - name: Trigger ETL Job
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks jobs run-now --job-id ${{ secrets.ETL_JOB_ID }} \
+            --notebook-params "{\"target_schema\":\"${{ steps.set-schema.outputs.SCHEMA }}\"}"
