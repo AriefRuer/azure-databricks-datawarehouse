@@ -60,7 +60,7 @@ jobs:
           else
             BRANCH=main
           fi
-          databricks repos update --path "/Repos/1211112109@student.mmu.edu.my/azure-databricks-datawarehouse" --branch "$BRANCH"
+          databricks repos update --path "/Workspace/Repos/1211112109@student.mmu.edu.my/azure-databricks-datawarehouse" --branch "$BRANCH"
       - name: Trigger ETL Job
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
