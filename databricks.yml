@@ -1,6 +1,9 @@
-
 bundle:
   name: retailrocket-etl
+
+variables:
+  schema:
+    description: Target schema for the ETL pipeline
 
 resources:
   jobs:
@@ -15,6 +18,8 @@ resources:
             autotermination_minutes: 15
           notebook_task:
             notebook_path: ./04-etl/etl-bronze-to-silver
+            base_parameters:
+              schema: ${var.schema}
         - task_key: silver_to_gold
           depends_on: [{ task_key: bronze_to_silver }]
           new_cluster:
@@ -24,6 +29,8 @@ resources:
             autotermination_minutes: 15
           notebook_task:
             notebook_path: ./04-etl/etl-silver-to-gold
+            base_parameters:
+              schema: ${var.schema}
         - task_key: quality_checks
           depends_on: [{ task_key: silver_to_gold }]
           new_cluster:
@@ -33,6 +40,8 @@ resources:
             autotermination_minutes: 15
           notebook_task:
             notebook_path: ./04-etl/etl-verification-checks
+            base_parameters:
+              schema: ${var.schema}
 
 targets:
   dev:
@@ -40,4 +49,4 @@ targets:
       schema: retailrocket_dev
   prod:
     variables:
-      schema: retailrocket
+      schema: obd
