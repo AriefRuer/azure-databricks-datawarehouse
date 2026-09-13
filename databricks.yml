@@ -1,3 +1,13 @@
+
+targets:
+  dev:
+    variables:
+      schema: retailrocket_dev
+  prod:
+    variables:
+      schema: retailrocket
+
+
 bundle:
   name: retailrocket-etl
 
@@ -9,8 +19,8 @@ resources:
   jobs:
     retailrocket-etl-job:
       name: retailrocket ETL
-      tasks:
-        - task_key: bronze_to_silver
+      job_clusters:
+        - job_cluster_key: ETL_jobs_cluster
           new_cluster:
             spark_version: "13.3.x-scala2.12"
             node_type_id: "Standard_DS3_v2"
@@ -20,36 +30,23 @@ resources:
               spark.master: local[*]
             custom_tags:
               ResourceClass: SingleNode
+      tasks:
+        - task_key: bronze_to_silver
+          job_cluster_key: ETL_jobs_cluster
           notebook_task:
             notebook_path: ./04-etl/etl-bronze-to-silver.ipynb
             base_parameters:
               schema: ${var.schema}
         - task_key: silver_to_gold
           depends_on: [{ task_key: bronze_to_silver }]
-          new_cluster:
-            spark_version: "13.3.x-scala2.12"
-            node_type_id: "Standard_DS3_v2"
-            num_workers: 0
-            spark_conf:
-              spark.databricks.cluster.profile: singleNode
-              spark.master: local[*]
-            custom_tags:
-              ResourceClass: SingleNode
+          job_cluster_key: ETL_jobs_cluster
           notebook_task:
             notebook_path: ./04-etl/etl-silver-to-gold.ipynb
             base_parameters:
               schema: ${var.schema}
         - task_key: quality_checks
           depends_on: [{ task_key: silver_to_gold }]
-          new_cluster:
-            spark_version: "13.3.x-scala2.12"
-            node_type_id: "Standard_DS3_v2"
-            num_workers: 0
-            spark_conf:
-              spark.databricks.cluster.profile: singleNode
-              spark.master: local[*]
-            custom_tags:
-              ResourceClass: SingleNode
+          job_cluster_key: ETL_jobs_cluster
           notebook_task:
             notebook_path: ./04-etl/etl-verification-checks.ipynb
             base_parameters:
