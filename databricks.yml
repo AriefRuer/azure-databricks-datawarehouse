@@ -13,7 +13,7 @@ resources:
         - task_key: bronze_to_silver
           new_cluster:
             spark_version: "13.3.x-scala2.12"
-            node_type_id: "Standard_DS2_v2"
+            node_type_id: "Standard_DS3_v2"
             num_workers: 0
             spark_conf:
               spark.databricks.cluster.profile: singleNode
@@ -28,7 +28,7 @@ resources:
           depends_on: [{ task_key: bronze_to_silver }]
           new_cluster:
             spark_version: "13.3.x-scala2.12"
-            node_type_id: "Standard_DS2_v2"
+            node_type_id: "Standard_DS3_v2"
             num_workers: 0
             spark_conf:
               spark.databricks.cluster.profile: singleNode
@@ -43,7 +43,7 @@ resources:
           depends_on: [{ task_key: silver_to_gold }]
           new_cluster:
             spark_version: "13.3.x-scala2.12"
-            node_type_id: "Standard_DS2_v2"
+            node_type_id: "Standard_DS3_v2"
             num_workers: 0
             spark_conf:
               spark.databricks.cluster.profile: singleNode
