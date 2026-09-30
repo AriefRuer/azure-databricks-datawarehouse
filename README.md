@@ -1,6 +1,6 @@
 # RetailRocket Data Warehouse using Azure Cloud Services
 
-An end-to-end data warehouse project built on the Microsoft Azure stack, using the [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset) (~2.7M events) to enable downstream BI analytics in Azure SQL. The pipeline follows a medallion architecture (bronze → silver → gold), models the data as a Kimball star schema (5 dimensions + 1 fact), is deployed with CI/CD via GitHub Actions and scheduled via Azure Data Factory.
+An end-to-end data warehouse project built on the Microsoft Azure stack, using the [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset). The RetailRocket dataset is an anonymized e-commerce event log (~2.7M events) originally published for recommender systems research, capturing the view → addtocart → transaction funnel that this warehouse models into a star schema to enable downstream behavioral/conversion analytics in Azure SQL. The pipeline follows a medallion architecture (bronze → silver → gold), models the data as a Kimball star schema (5 dimensions + 1 fact), is deployed with CI/CD via GitHub Actions and scheduled via Azure Data Factory.
 
 **Status:** 🗄️ **Archived** (30 September 2026)
 **Stack:** Azure Blob Storage · Azure Databricks (PySpark) · Azure SQL Database · GitHub Actions · Azure Data Factory
