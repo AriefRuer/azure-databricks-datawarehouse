@@ -297,7 +297,7 @@ azure-databricks-datawarehouse/
         └── azure_sql_verify_fact_table.png
 ```
 
-**Branch note:** All work lives on the `dev` branch. The `dev` → `main` PR was never opened, so `main` is incomplete.
+**Branch note:** All work lives on the `dev` branch before being PR'd into `main`.
 
 ---
 
