@@ -170,9 +170,9 @@ Being honest about gaps:
 ## What Was Built
 
 ### Built
-- Full medallion ETL: bronze → silver → gold built from Databricks into Azure SQL Server
-- Star schema with 5 dims + 1 fact at the correct grain
-- Referential-integrity verification notebook
+- Fully functioning medallion ETL: bronze → silver → gold built from Databricks into Azure SQL Server via Databricks Jobs and Azure Data Factory
+- Star schema with 5 dims + 1 fact at the correct grain inside of Azure SQL Database
+- Referential-integrity verification notebook (validation)
 - GitHub Actions workflow configured for branch-based deploys, successfully validated and updated databricks job definitions prior to access loss.
 
 
