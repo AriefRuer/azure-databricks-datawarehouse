@@ -325,6 +325,7 @@ If access is restored or a fresh Azure subscription is used, the project can be 
 5. **GitHub** — generate a fine-grained PAT (Contents Read/Write); connect Databricks Git folder to this repo
 6. **CI/CD** — set repository secrets `DATABRICKS_HOST` and `DATABRICKS_TOKEN` to the new workspace URL and PAT
 7. **Run ETL** — execute notebooks in order: `EDA.ipynb` → `etl-bronze-to-silver.ipynb` → `etl-silver-to-gold.ipynb` → `etl-verification-checks.ipynb`
+8. **Automated ETL trigger** - wire the Databricks jobs in order via 'databricks.yml' and create a scheduled trigger using Azure Data Factory.
 8. **Power BI** *(future implementation)* — connect to Azure SQL, import gold tables, build dashboards for conversion funnel analytics
 
 ### Known gotchas
