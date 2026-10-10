@@ -1,6 +1,6 @@
 # RetailRocket Data Warehouse using Azure Cloud Services
 
-An end-to-end data warehouse project built on the Microsoft Azure stack, using the [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset) — 2,756,101 event rows plus a 20,275,902-row item-property change log — to enable downstream BI analytics in Azure SQL. The pipeline follows a medallion architecture (bronze → silver → gold), models the data as a Kimball star schema (5 dimensions + 1 fact), and is deployed with CI/CD via GitHub Actions. An Azure Data Factory trigger was configured, but no scheduled run was captured — the execution evidence in this repo comes from a manual Databricks job run. A serverless rebuild of this warehouse on BigQuery followed this project: [retailrocket-bigquery-warehouse](https://github.com/AriefRuer/retailrocket-bigquery-warehouse).
+An end-to-end data warehouse project built on the Microsoft Azure stack, using the [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset). The RetailRocket dataset is an anonymized e-commerce event log (~2.7M events) originally published for recommender systems research, capturing the view → addtocart → transaction funnel that this warehouse models into a star schema to enable downstream behavioral/conversion analytics in Azure SQL. The pipeline follows a medallion architecture (bronze → silver → gold), models the data as a Kimball star schema (5 dimensions + 1 fact), is deployed with CI/CD via GitHub Actions and scheduled via Azure Data Factory.A serverless rebuild of this warehouse on BigQuery followed this project: [retailrocket-bigquery-warehouse](https://github.com/AriefRuer/retailrocket-bigquery-warehouse).
 
 **Status:** 🗄️ **Archived** (30 September 2026)
 **Stack:** Azure Blob Storage · Azure Databricks (PySpark) · Azure SQL Database · GitHub Actions · Azure Data Factory
@@ -381,7 +381,7 @@ azure-databricks-datawarehouse/
         └── azure_sql_verify_fact_table.png
 ```
 
-**Branch note:** All work lives on the `dev` branch. The `dev` → `main` PR was never opened, so `main` is incomplete.
+**Branch note:** All work lives on the `dev` branch before being PR'd into `main`.
 
 ---
 
@@ -409,6 +409,7 @@ If access is restored or a fresh Azure subscription is used, the project can be 
 5. **GitHub** — generate a fine-grained PAT (Contents Read/Write); connect Databricks Git folder to this repo
 6. **CI/CD** — set repository secrets `DATABRICKS_HOST` and `DATABRICKS_TOKEN` to the new workspace URL and PAT
 7. **Run ETL** — execute notebooks in order: `EDA.ipynb` → `etl-bronze-to-silver.ipynb` → `etl-silver-to-gold.ipynb` → `etl-verification-checks.ipynb`
+8. **Automated ETL trigger** - wire the Databricks jobs in order via 'databricks.yml' and create a scheduled trigger using Azure Data Factory.
 8. **Power BI** *(future implementation)* — connect to Azure SQL, import gold tables, build dashboards for conversion funnel analytics
 
 ### Known gotchas
@@ -450,4 +451,4 @@ Rebuilt serverless on Google BigQuery after the Azure subscription expired: [ret
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
