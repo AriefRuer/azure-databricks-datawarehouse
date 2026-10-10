@@ -1,14 +1,14 @@
 
 ## Audit map — every resource → its files
 
-| Azure resource |
-|---|
-| **Resource Group** `rg-azure-dw` | 
-| **Storage Account** `stdwportfolio` | 
-| **Azure SQL** `retailrocket-dw` |
-| **Databricks** `dbw-retailrocket` |
-| **ADF** `adf-retailrocket` |
-| **Power BI** | 
+| Azure resource | Resource Name |
+|---|---|
+| **Resource Group** |  `rg-azure-dw` | 
+| **Storage Account** | `stdwportfolio` | 
+| **Azure SQL** | `retailrocket-dw` |
+| **Databricks** | `dbw-retailrocket` |
+| **ADF** | `adf-retailrocket` |
+| **Power BI** | - |
 
 
 ## CI/CD environments (branch → target)
