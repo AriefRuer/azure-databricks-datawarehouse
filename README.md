@@ -1,6 +1,6 @@
 # RetailRocket Data Warehouse using Azure Cloud Services
 
-An end-to-end data warehouse project built on the Microsoft Azure stack, using the [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset). The RetailRocket dataset is an anonymized e-commerce event log (~2.7M events) originally published for recommender systems research, capturing the view → addtocart → transaction funnel that this warehouse models into a star schema to enable downstream behavioral/conversion analytics in Azure SQL. The pipeline follows a medallion architecture (bronze → silver → gold), models the data as a Kimball star schema (5 dimensions + 1 fact), is deployed with CI/CD via GitHub Actions and scheduled via Azure Data Factory.
+An end-to-end data warehouse project built on the Microsoft Azure stack, using the [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset). The RetailRocket dataset is an anonymized e-commerce event log (~2.7M events) originally published for recommender systems research, capturing the view → addtocart → transaction funnel that this warehouse models into a star schema to enable downstream behavioral/conversion analytics in Azure SQL. The pipeline follows a medallion architecture (bronze → silver → gold), models the data as a Kimball star schema (5 dimensions + 1 fact), deploys its Databricks job definitions with CI/CD via GitHub Actions, and had Azure Data Factory scheduling configured (a scheduled run was never captured).
 
 **Status:** 🗄️ **Archived** (30 September 2026)
 **Stack:** Azure Blob Storage · Azure Databricks (PySpark) · Azure SQL Database · GitHub Actions · Azure Data Factory
@@ -27,11 +27,11 @@ An end-to-end data warehouse project built on the Microsoft Azure stack, using t
 
 - **Medallion ETL architecture** — bronze (raw) → silver (cleansed) → gold (star schema), with clear separation of concerns
 - **Kimball dimensional modeling** — 5 conformed dimensions + 1 fact table at the grain of one user action
-- **PySpark transformations** — window functions for SCD Type 1, deterministic surrogate keys, `.cache()` discipline to prevent key regeneration
-- **Environment separation** — `dev` branch → `retailrocket_dev` schema; `main` branch → `retailrocket` schema
+- **PySpark transformations** — window functions for SCD Type 1, `monotonically_increasing_id()` surrogate keys pinned with `.cache()` to prevent key regeneration within a run (see Known Limitations)
+- **Environment separation (designed, not effective)** — `databricks.yml` defines `dev` → `retailrocket_dev` and `prod` → `retailrocket` targets, but the schema parameter never reached the notebook, so every run wrote to `dbo` (see Known Limitations)
 - **CI/CD** — GitHub Actions workflow deploying via `databricks bundle deploy --target <dev|prod>`
 - **Security hygiene** — Databricks secrets scope for all credentials; read-only SQL user for BI (planned); firewall restricted to the developer laptop
-- **Data quality validation** — dedicated verification notebook for referential integrity and row-count assertions
+- **Data quality validation** — dedicated verification notebook for referential-integrity and row-count checks (reports PASS/FAIL; does not fail the job)
 
 ---
 
@@ -85,7 +85,7 @@ Azure SQL Database  (retailrocket-dw)
 | `dim_date`       | One row per calendar date | `date_sk`, `full_date`, `year`, `month`, `day`, `day_of_week`, `day_name`, `is_weekend`, `month_name`, `quarter` |
 | `dim_users`      | One row per `visitorid`   | `user_sk`, `visitorid`, `first_event_ts`, `last_event_ts`, `total_events`, `total_purchases`, `has_purchased`    |
 | `dim_items`      | One row per `itemid`      | `item_sk`, `itemid`, `category_sk`                                                                               |
-| `dim_categories` | One row per category      | `category_sk`, `category_id`, `parent_id`, `parent_sk`                                                           |
+| `dim_categories` | One row per category      | `category_sk`, `category_id`, `parent_id`                                                                        |
 | `dim_event_type` | One row per event type    | `event_type_sk`, `event_type` (`view` / `addtocart` / `transaction`)                                             |
 
 ### Fact
@@ -100,10 +100,10 @@ Azure SQL Database  (retailrocket-dw)
 
 | Notebook                        | Location  | Purpose                                                           |
 | ------------------------------- | --------- | ----------------------------------------------------------------- |
-| `EDA.ipynb`                     | `03-eda/` | Full dataset exploration — distributions, null rates, cardinality |
+| `EDA.ipynb`                     | `03-eda-databricks/` | Full dataset exploration — distributions, null rates, cardinality |
 | `etl-bronze-to-silver.ipynb`    | `04-etl/` | Load CSVs → bronze Delta tables; cleanse and dedup → silver       |
 | `etl-silver-to-gold.ipynb`      | `04-etl/` | Build star schema; load gold tables into Azure SQL via JDBC       |
-| `etl-verification-checks.ipynb` | `04-etl/` | Referential integrity, row-count assertions, orphan-key checks    |
+| `etl-verification-checks.ipynb` | `04-etl/` | Referential integrity, row-count and orphan-key checks (prints PASS/FAIL; does not fail the job) |
 
 **Execution order is strict:** EDA → bronze-to-silver → silver-to-gold → verification. Each notebook must be run top-to-bottom; individual cells must never be re-run out of order (see Lessons Learned).
 
@@ -137,14 +137,14 @@ Landing asks *did the bytes arrive intact?* Bronze: *are types trustworthy?* Sil
 | `dim_date`: distinct dates + calendar attributes + `monotonically_increasing_id()` **+ `.cache()`** | Date spine from data covers exactly the 139 active dates. `.cache()` pins the surrogate keys so a later Spark re-evaluation can't regenerate them — the core fix of Engineering Challenge #1 (keys must survive the fact-table join). |
 | `dim_users`: `groupBy visitorid` → first/last event, totals, `has_purchased`, key + `.cache()` | Session noise rolled into one analyzable row per visitor. |
 | `dim_items`: `row_number() OVER (PARTITION BY itemid ORDER BY timestamp_ms DESC) = 1` picks latest category; starts from `DISTINCT itemid IN events`, LEFT JOINs categories | SCD Type 1 (one row per item, latest category wins) **and** the Engineering Challenge #2 fix: starting from events guarantees every fact item exists in the dimension — 78.8% get a category, 21.2% keep NULL instead of orphaning fact rows. |
-| `fact_events`: LEFT JOINs to all four dims, `monotonically_increasing_id()` key | Produces the fact at one-row-per-action grain; referential integrity is then **checked, not assumed**, by `etl-verification-checks.ipynb` (row counts, orphan keys, `transactionid` discipline). *(The BigQuery successor hardens this to INNER joins + in-pipeline assertions.)* |
+| `fact_events`: LEFT JOINs to all four dims, `monotonically_increasing_id()` key | Produces the fact at one-row-per-action grain; referential integrity is then **checked, not assumed**, by `etl-verification-checks.ipynb` (row counts, orphan keys, `transactionid` discipline). The checks only print results; a failure does not stop the job. *(The BigQuery successor hardens this to INNER joins + in-pipeline assertions.)* |
 | JDBC load: `connectRetryCount=3;connectRetryInterval=10`, `write_with_retry` (3 attempts, 10 s sleep), secrets-scoped `etl_loader` password | Intermittent Azure SQL load-balancer drops mid-write corrupted partial loads (Engineering Challenge #4) — retries make the load self-healing; the credential never appears in code (secrets scope `retailrocket`). |
 
 ---
 
 ## The Data at a Glance (Analyst Notes)
 
-Profiled in `03-eda/EDA.ipynb` on the full dataset (the 1,000-row samples in `02-data/samples/` exist only so the repo runs without cloud access).
+Profiled in `03-eda-databricks/EDA.ipynb` on the full dataset (the 1,000-row samples in `02-data/samples/` exist only so the repo runs without cloud access).
 
 **Per-layer row counts** — recomputed locally from the full Kaggle CSVs using the same cleaning rules the notebooks apply; silver/gold counts independently confirmed by the Azure SQL screenshot below:
 
@@ -221,13 +221,13 @@ The gold star-schema build — dimensions and fact table materialized from silve
 
 ![ETL job pipeline](docs/screenshots/ETL_job_pipeline.png)
 
-The Databricks Job pipeline view — a manual run (13 September 2026, 12m18s): bronze → silver and silver → gold completed; verification was still queued when the capture was taken. Task-level status configured via `databricks.yml` with branch-routed targets (`dev` → `retailrocket_dev`, `main` → `retailrocket`). Note: launched manually, not by a trigger.
+The Databricks Job pipeline view — a manual run (13 September 2026, 12m18s): bronze → silver and silver → gold completed; verification was still queued when the capture was taken. Task-level status configured via `databricks.yml`, which defines branch-routed targets (`dev` → `retailrocket_dev`, `main` → `retailrocket`); the target schema did not reach the notebook, so the run wrote to `dbo`. Note: launched manually, not by a trigger.
 
 ### 8. Azure SQL — gold tables loaded
 
 ![Azure SQL verify DW](docs/screenshots/azure_sql_verify_dw.png)
 
-Azure SQL Query editor (`retailrocket-dw`) showing the six gold tables created in the `retailrocket` schema. The JDBC bulk load from Databricks succeeded — data is now in the serving layer, ready for BI consumption.
+Azure SQL Query editor (`retailrocket-dw`) showing the six gold tables created in the `dbo` schema (not `retailrocket`; see Known Limitations). The JDBC bulk load from Databricks succeeded — data is now in the serving layer, ready for BI consumption.
 
 ### 9. Azure SQL — row count verification
 
@@ -251,12 +251,32 @@ Being honest about gaps:
 - **CI/CD on `main` with green output** — the workflow validated and deployed job definitions on `dev` before access loss, but no end-to-end post-merge deployment was recorded.
 
 
+## Known Limitations
+
+These are gaps between the design and what the code actually does, plus normal design limits. The code is left as it ran; they are documented here rather than fixed after the fact.
+
+**Code vs documented behaviour**
+
+- **Dev/prod schema separation never took effect.** `databricks.yml` passes a parameter named `schema`, but `etl-silver-to-gold.ipynb` reads a widget named `target_schema`. The read fails silently and falls back to `dbo`, so both targets would write to the same Azure SQL tables. The screenshot `azure_sql_verify_dw.png` confirms the tables landed in `dbo`. `etl-bronze-to-silver.ipynb` does not read the parameter at all, so the Delta `bronze` / `silver` / `gold` schemas are also shared across targets.
+- **The verification notebook does not fail the job.** `etl-verification-checks.ipynb` counts failures and prints a summary, but never raises an error, so the Databricks job would show green even if a check failed. The fix would be to end the notebook with `if checks_failed > 0: raise Exception(...)`.
+- **No scheduled run was proven.** Azure Data Factory was configured, but only a manual job run was captured.
+
+**Design limits**
+
+- **`.cache()` reduces the surrogate-key problem but does not remove it.** Spark can evict cached data under memory pressure and recompute it, which would assign new keys. The proper fix is deterministic (hash-based) keys, which the [BigQuery rebuild](https://github.com/AriefRuer/retailrocket-bigquery-warehouse) uses.
+- **De-duplication does not choose which copy survives.** `dropDuplicates` keeps an arbitrary row among repeats; it does not guarantee the copy carrying a `transactionid` wins.
+- **SCD Type 1 loses history.** Every past event is reported under the item's latest category.
+- **Full rebuild on every run.** All gold tables are dropped and rebuilt; there are no incremental loads.
+- **One-level category tree.** `dim_categories` holds only the direct parent; rolling up to a top-level category needs a recursive query.
+- **Static historical dataset.** There is no live source, so scheduling would only prove the pipeline can re-run, not that it handles new data.
+- **No dashboards and no automated tests.** Power BI was never built, and `scripts/sample-data.py` has no tests.
+
 ## What Was Built
 
 ### Built
 - Medallion ETL (bronze → silver → gold) running from Databricks into Azure SQL Database via Databricks Jobs — executed end-to-end to a fully populated serving layer (manual run captured; ADF trigger configured but not captured)
 - Star schema with 5 dims + 1 fact at the correct grain inside of Azure SQL Database
-- Referential-integrity verification notebook (validation)
+- Referential-integrity verification notebook (validation; reports results but does not fail the job)
 - GitHub Actions workflow configured for branch-based deploys, successfully validated and updated databricks job definitions prior to access loss.
 
 
@@ -266,7 +286,7 @@ Being honest about gaps:
 
 `monotonically_increasing_id()` is **non-deterministic** — Spark is lazy, and each `.write()` re-evaluates the entire pipeline from source. Without intervention, the dimension tables get new keys on every write while `fact_events` retains the keys from a previous run. The result: **silent referential integrity breakage**.
 
-**Fix:** call `.cache()` on every dimension DataFrame immediately after assigning the surrogate key. This forces materialization and pins the keys for the rest of the session. All five dimensions in `etl-silver-to-gold.ipynb` end with `.cache()  # Prevent different IDs generated when joining with fact_events.`
+**Fix:** call `.cache()` on every dimension DataFrame immediately after assigning the surrogate key. This forces materialization and pins the keys for the rest of the session. All five dimensions in `etl-silver-to-gold.ipynb` call `.cache()` right after the key is assigned. This reduces the risk but does not remove it (see Known Limitations).
 
 ### 2. `dim_items` missing uncategorized items
 
@@ -359,8 +379,11 @@ azure-databricks-datawarehouse/
 │   ├── README.md
 │   └── samples/                         # 1,000-row CSVs (runnable without cloud)
 │
-├── 03-eda/
+├── 03-eda-databricks/
 │   └── EDA.ipynb                        # Full dataset exploration
+│
+├── scripts/
+│   └── sample-data.py                   # Builds the 1,000-row samples
 │
 ├── 04-etl/
 │   ├── etl-bronze-to-silver.ipynb       # Bronze load + silver clean/dedup
@@ -408,9 +431,9 @@ If access is restored or a fresh Azure subscription is used, the project can be 
    ```
 5. **GitHub** — generate a fine-grained PAT (Contents Read/Write); connect Databricks Git folder to this repo
 6. **CI/CD** — set repository secrets `DATABRICKS_HOST` and `DATABRICKS_TOKEN` to the new workspace URL and PAT
-7. **Run ETL** — execute notebooks in order: `EDA.ipynb` → `etl-bronze-to-silver.ipynb` → `etl-silver-to-gold.ipynb` → `etl-verification-checks.ipynb`
+7. **Run ETL** — execute notebooks in order: `03-eda-databricks/EDA.ipynb` → `etl-bronze-to-silver.ipynb` → `etl-silver-to-gold.ipynb` → `etl-verification-checks.ipynb`
 8. **Automated ETL trigger** - wire the Databricks jobs in order via 'databricks.yml' and create a scheduled trigger using Azure Data Factory.
-8. **Power BI** *(future implementation)* — connect to Azure SQL, import gold tables, build dashboards for conversion funnel analytics
+9. **Power BI** *(future implementation)* — connect to Azure SQL, import gold tables, build dashboards for conversion funnel analytics
 
 ### Known gotchas
 
